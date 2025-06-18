@@ -3,7 +3,8 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Filter, Search } from "lucide-react";
+import { Filter, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 import { useResourceStore, useFilteredResources, useAllSubtopics, Question } from "@/store/useResourceStore";
 
@@ -17,6 +18,36 @@ export function ResourcesPage() {
   const allSubtopics = useAllSubtopics();
   const filteredCompanies = useFilteredResources();
   const [topicSearchQuery, setTopicSearchQuery] = React.useState("");
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const itemsPerPage = 9; // Number of questions per page
+
+  // Calculate total number of questions
+  const totalQuestions = filteredCompanies.reduce((acc, [_, questions]) => acc + questions.length, 0);
+  const totalPages = Math.ceil(totalQuestions / itemsPerPage);
+
+  // Get current page questions
+  const getCurrentPageQuestions = () => {
+    let count = 0;
+    const result: [string, Question[]][] = [];
+    
+    for (const [company, questions] of filteredCompanies) {
+      const remainingQuestions = questions.slice(
+        Math.max(0, (currentPage - 1) * itemsPerPage - count),
+        Math.max(0, currentPage * itemsPerPage - count)
+      );
+      
+      if (remainingQuestions.length > 0) {
+        result.push([company, remainingQuestions]);
+      }
+      
+      count += questions.length;
+      if (count >= currentPage * itemsPerPage) break;
+    }
+    
+    return result;
+  };
+
+  const currentPageQuestions = getCurrentPageQuestions();
 
   const toggleSubtopic = (topic: string) => {
     if (selectedSubtopics.includes(topic)) {
@@ -29,6 +60,11 @@ export function ResourcesPage() {
   const filteredTopics = allSubtopics.filter(topic => 
     topic.toLowerCase().includes(topicSearchQuery.toLowerCase())
   );
+
+  // Reset to first page when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, sortBy, selectedSubtopics]);
 
   return (
     <div className="container mx-auto p-8">
@@ -118,27 +154,54 @@ export function ResourcesPage() {
 
         {/* Main Content */}
         <div className="flex-1">
-          {filteredCompanies.length === 0 ? (
+          {currentPageQuestions.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-muted-foreground">
                 No questions found matching your criteria
               </p>
             </div>
           ) : (
-            <div className="grid gap-8">
-              {filteredCompanies.map(([company, questions]) => (
-                <div key={company}>
-                  <h2 className="text-xl font-semibold mb-4 capitalize">
-                    {company}
-                  </h2>
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {questions.map((question) => (
-                      <QuestionCard key={question.question_no} question={question} />
-                    ))}
+            <>
+              <div className="grid gap-8">
+                {currentPageQuestions.map(([company, questions]) => (
+                  <div key={company}>
+                    <h2 className="text-xl font-semibold mb-4 capitalize">
+                      {company}
+                    </h2>
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {questions.map((question) => (
+                        <QuestionCard key={question.question_no} question={question} />
+                      ))}
+                    </div>
                   </div>
+                ))}
+              </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 mt-8">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <div className="text-sm">
+                    Page {currentPage} of {totalPages}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
       </div>
